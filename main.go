@@ -18,11 +18,11 @@ import (
 )
 
 type config struct {
-	awsRegion        string
-	databaseName     string
-	listenAddr       string
-	tableName        string
-	telemetryPath    string
+	awsRegion     string
+	databaseName  string
+	listenAddr    string
+	tableName     string
+	telemetryPath string
 }
 
 var (
@@ -87,7 +87,7 @@ func main() {
 
 	timeStreamAdapter := newTimeStreamAdapter(sugar, cfg)
 	if err := serve(sugar, cfg.listenAddr, timeStreamAdapter); err != nil {
-		sugar.Errorw("msg","Failed to listen", "addr", cfg.listenAddr, "err", err)
+		sugar.Errorw("Failed to listen", "addr", cfg.listenAddr, "err", err)
 		os.Exit(1)
 	}
 }
@@ -101,21 +101,21 @@ func serve(logger *zap.SugaredLogger, addr string, ad adapter) error {
 	http.HandleFunc("/write", func(w http.ResponseWriter, r *http.Request) {
 		compressed, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			logger.Errorw("msg", "Read error", "err", err.Error())
+			logger.Errorw("Read error", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		reqBuf, err := snappy.Decode(nil, compressed)
 		if err != nil {
-			logger.Errorw("msg", "Decode error", "err", err.Error())
+			logger.Errorw("Decode error", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		var req prompb.WriteRequest
 		if err := proto.Unmarshal(reqBuf, &req); err != nil {
-			logger.Errorw("msg", "Unmarshal error", "err", err.Error())
+			logger.Errorw("Unmarshal error", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -134,7 +134,7 @@ func sendRecords(logger *zap.SugaredLogger, ad adapter, records []*timestreamwri
 	err := ad.Write(records)
 	duration := time.Since(begin).Seconds()
 	if err != nil {
-		logger.Warnw("msg", "Error sending samples to remote storage", "err", err, "storage", ad.Name(), "num_samples", len(records))
+		logger.Warnw("Error sending samples to remote storage", "err", err, "storage", ad.Name(), "num_samples", len(records))
 		failedSamples.WithLabelValues(ad.Name()).Add(float64(len(records)))
 	}
 	sentSamples.WithLabelValues(ad.Name()).Add(float64(len(records)))
