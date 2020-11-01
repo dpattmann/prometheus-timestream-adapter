@@ -1,17 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"go.uber.org/zap"
 	"net"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/timestreamwrite"
 	"github.com/aws/aws-sdk-go/service/timestreamwrite/timestreamwriteiface"
-	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
 	"golang.org/x/net/http2"
 )
@@ -97,8 +96,8 @@ func protoToRecords(req *prompb.WriteRequest) (records []*timestreamwrite.Record
 				Dimensions:       dimensions,
 				MeasureName:      aws.String(measureName),
 				MeasureValueType: aws.String("DOUBLE"),
-				MeasureValue:     aws.String(strconv.FormatFloat(s.Value, 'f', -1, 64)),
-				Time:             aws.String(model.Time(s.Timestamp).String()),
+				MeasureValue:     aws.String(fmt.Sprint(s.Value)),
+				Time:             aws.String(fmt.Sprint(s.Timestamp)),
 				TimeUnit:         aws.String("MILLISECONDS"),
 			})
 		}

@@ -82,7 +82,7 @@ func Test_protoToRecords(t *testing.T) {
 							Samples: []prompb.Sample{
 								{
 									Value:     float64(12345),
-									Timestamp: int64(1604170583682),
+									Timestamp: int64(1604254700024),
 								},
 							},
 						},
@@ -100,7 +100,7 @@ func Test_protoToRecords(t *testing.T) {
 					MeasureName:      aws.String("sample_metric"),
 					MeasureValue:     aws.String("12345"),
 					MeasureValueType: aws.String("DOUBLE"),
-					Time:             aws.String("1604170583.682"),
+					Time:             aws.String("1604254700024"),
 					TimeUnit:         aws.String("MILLISECONDS"),
 				},
 			},
