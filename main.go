@@ -64,11 +64,11 @@ func init() {
 	prometheus.MustRegister(failedSamples)
 	prometheus.MustRegister(sentBatchDuration)
 
-	flag.StringVar(&cfg.awsRegion, "awsRegion", "eu-central-1","")
-	flag.StringVar(&cfg.databaseName, "databaseName", "prometheus-database","")
-	flag.StringVar(&cfg.listenAddr, "listenAddr", ":9201","")
-	flag.StringVar(&cfg.tableName, "tableName", "prometheus-table","")
-	flag.StringVar(&cfg.telemetryPath, "telemetryPath", "/metric","")
+	flag.StringVar(&cfg.awsRegion, "awsRegion", "eu-central-1", "")
+	flag.StringVar(&cfg.databaseName, "databaseName", "prometheus-database", "")
+	flag.StringVar(&cfg.listenAddr, "listenAddr", ":9201", "")
+	flag.StringVar(&cfg.tableName, "tableName", "prometheus-table", "")
+	flag.StringVar(&cfg.telemetryPath, "telemetryPath", "/metric", "")
 
 	flag.Parse()
 }

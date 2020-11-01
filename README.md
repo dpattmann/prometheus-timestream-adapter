@@ -27,4 +27,4 @@ remote_write:
 
 ### Why is there no remote_reader?
 
-[AWS Timestream](https://aws.amazon.com/timestream) has a very powerful [query language](https://docs.aws.amazon.com/timestream/latest/developerguide/reference.html) and there is a [Grafana Plugin](https://grafana.com/grafana/plugins/grafana-timestream-datasource) supports Timestream as a datasource. However, this is the reason why I don't think a reader implementation ist needed.
+[AWS Timestream](https://aws.amazon.com/timestream) has a very powerful [query language](https://docs.aws.amazon.com/timestream/latest/developerguide/reference.html) and there is a [Grafana Plugin](https://grafana.com/grafana/plugins/grafana-timestream-datasource) supporting Timestream as a datasource. However, this is the reason why I don't think a reader implementation is needed.
