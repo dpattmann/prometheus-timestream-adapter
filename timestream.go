@@ -21,6 +21,7 @@ package main
 import (
 	"fmt"
 	"go.uber.org/zap"
+	"math"
 	"net"
 	"net/http"
 	"time"
@@ -105,11 +106,18 @@ func readLabels(labels []*prompb.Label) (dimensions []*timestreamwrite.Dimension
 	return
 }
 
-func protoToRecords(req *prompb.WriteRequest) (records []*timestreamwrite.Record) {
+func protoToRecords(logger *zap.SugaredLogger, req *prompb.WriteRequest) (records []*timestreamwrite.Record) {
 	for _, ts := range req.Timeseries {
 		dimensions, measureName := readLabels(ts.Labels)
-
 		for _, s := range ts.Samples {
+			switch {
+			case math.IsNaN(s.Value) || math.IsInf(s.Value, 0):
+				continue
+			case len(measureName) >= 62:
+				logger.Warnw("Measure name exceeds the maximum supported length", "Measure name", measureName, "Measure name length", len(measureName))
+				continue
+			}
+
 			records = append(records, &timestreamwrite.Record{
 				Dimensions:       dimensions,
 				MeasureName:      aws.String(measureName),

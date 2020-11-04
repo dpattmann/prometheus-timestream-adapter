@@ -19,11 +19,14 @@
 package main
 
 import (
+	"math"
+	"reflect"
+	"testing"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/timestreamwrite"
 	"github.com/prometheus/prometheus/prompb"
-	"reflect"
-	"testing"
+	"go.uber.org/zap"
 )
 
 func Test_readLabels(t *testing.T) {
@@ -123,10 +126,122 @@ func Test_protoToRecords(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Prom with NaN value",
+			args: args{
+				req: &prompb.WriteRequest{
+					Timeseries: []*prompb.TimeSeries{
+						{
+							Labels: []*prompb.Label{
+								{
+									Name:  "__name__",
+									Value: "sample_metric",
+								},
+								{
+									Name:  "job",
+									Value: "testing",
+								},
+							},
+							Samples: []prompb.Sample{
+								{
+									Value:     math.NaN(),
+									Timestamp: int64(1604254700024),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantRecords: nil,
+		},
+		{
+			name: "Prom with positive inf number",
+			args: args{
+				req: &prompb.WriteRequest{
+					Timeseries: []*prompb.TimeSeries{
+						{
+							Labels: []*prompb.Label{
+								{
+									Name:  "__name__",
+									Value: "sample_metric",
+								},
+								{
+									Name:  "job",
+									Value: "testing",
+								},
+							},
+							Samples: []prompb.Sample{
+								{
+									Value:     math.Inf(1),
+									Timestamp: int64(1604254700024),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantRecords: nil,
+		},
+		{
+			name: "Prom with negative inf number",
+			args: args{
+				req: &prompb.WriteRequest{
+					Timeseries: []*prompb.TimeSeries{
+						{
+							Labels: []*prompb.Label{
+								{
+									Name:  "__name__",
+									Value: "sample_metric",
+								},
+								{
+									Name:  "job",
+									Value: "testing",
+								},
+							},
+							Samples: []prompb.Sample{
+								{
+									Value:     math.Inf(-1),
+									Timestamp: int64(1604254700024),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantRecords: nil,
+		},
+		{
+			name: "Prom with long metric name",
+			args: args{
+				req: &prompb.WriteRequest{
+					Timeseries: []*prompb.TimeSeries{
+						{
+							Labels: []*prompb.Label{
+								{
+									Name:  "__name__",
+									Value: "sample_metric_measure_name_exceeds_the_maximum_supported_length",
+								},
+								{
+									Name:  "job",
+									Value: "testing",
+								},
+							},
+							Samples: []prompb.Sample{
+								{
+									Value:     float64(12345),
+									Timestamp: int64(1604254700024),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantRecords: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if gotRecords := protoToRecords(tt.args.req); !reflect.DeepEqual(gotRecords, tt.wantRecords) {
+			if gotRecords := protoToRecords(zap.NewNop().Sugar(), tt.args.req); !reflect.DeepEqual(gotRecords, tt.wantRecords) {
 				t.Errorf("protoToRecords() = %v, want %v", gotRecords, tt.wantRecords)
 			}
 		})

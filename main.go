@@ -138,7 +138,7 @@ func serve(logger *zap.SugaredLogger, addr string, ad adapter) error {
 			return
 		}
 
-		records := protoToRecords(&req)
+		records := protoToRecords(logger, &req)
 		receivedSamples.Add(float64(len(records)))
 
 		sendRecords(logger, ad, records)
