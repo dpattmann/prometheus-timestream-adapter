@@ -19,18 +19,14 @@
 package main
 
 import (
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/timestreamwrite"
-	"github.com/gogo/protobuf/proto"
-	"github.com/golang/snappy"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/prometheus/prompb"
 	flag "github.com/spf13/pflag"
 	"go.uber.org/zap"
 )
@@ -92,8 +88,6 @@ func init() {
 }
 
 func main() {
-	http.Handle(cfg.telemetryPath, promhttp.Handler())
-
 	sugarLogger, err := zap.NewProduction()
 
 	if err != nil {
@@ -103,7 +97,7 @@ func main() {
 	defer sugarLogger.Sync() // flushes buffer, if any
 	sugar := sugarLogger.Sugar()
 
-	timeStreamAdapter := newTimeStreamAdapter(sugar, cfg)
+	timeStreamAdapter := newTimeStreamAdapter(sugar, cfg, nil)
 	if err := serve(sugar, cfg.listenAddr, timeStreamAdapter); err != nil {
 		sugar.Errorw("Failed to listen", "addr", cfg.listenAddr, "err", err)
 		os.Exit(1)
@@ -116,40 +110,15 @@ type adapter interface {
 }
 
 func serve(logger *zap.SugaredLogger, addr string, ad adapter) error {
-	http.HandleFunc("/write", func(w http.ResponseWriter, r *http.Request) {
-		compressed, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			logger.Errorw("Read error", "err", err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		reqBuf, err := snappy.Decode(nil, compressed)
-		if err != nil {
-			logger.Errorw("Decode error", "err", err.Error())
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		var req prompb.WriteRequest
-		if err := proto.Unmarshal(reqBuf, &req); err != nil {
-			logger.Errorw("Unmarshal error", "err", err.Error())
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		records := protoToRecords(logger, &req)
-		receivedSamples.Add(float64(len(records)))
-
-		sendRecords(logger, ad, records)
-	})
+	http.Handle(cfg.telemetryPath, promhttp.Handler())
+	http.Handle("/write", writeHandler(logger, ad))
 
 	return http.ListenAndServe(addr, nil)
 }
 
-func sendRecords(logger *zap.SugaredLogger, ad adapter, records []*timestreamwrite.Record) {
+func sendRecords(logger *zap.SugaredLogger, ad adapter, records []*timestreamwrite.Record) (err error) {
 	begin := time.Now()
-	err := ad.Write(records)
+	err = ad.Write(records)
 	duration := time.Since(begin).Seconds()
 	if err != nil {
 		logger.Warnw("Error sending samples to remote storage", "err", err, "storage", ad.Name(), "num_samples", len(records))
@@ -157,4 +126,6 @@ func sendRecords(logger *zap.SugaredLogger, ad adapter, records []*timestreamwri
 	}
 	sentSamples.WithLabelValues(ad.Name()).Add(float64(len(records)))
 	sentBatchDuration.WithLabelValues(ad.Name()).Observe(duration)
+
+	return
 }

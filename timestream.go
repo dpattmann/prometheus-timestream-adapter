@@ -55,7 +55,7 @@ func (t TimeSteamAdapter) Name() string {
 	return "prometheus-timestream-adapter"
 }
 
-func newTimeStreamAdapter(logger *zap.SugaredLogger, cfg *config) TimeSteamAdapter {
+func newTimeStreamAdapter(logger *zap.SugaredLogger, cfg *config, writeSvc timestreamwriteiface.TimestreamWriteAPI) TimeSteamAdapter {
 	tr := &http.Transport{
 		ResponseHeaderTimeout: 20 * time.Second,
 		// Using DefaultTransport values for other parameters: https://golang.org/pkg/net/http/#RoundTripper
@@ -73,15 +73,21 @@ func newTimeStreamAdapter(logger *zap.SugaredLogger, cfg *config) TimeSteamAdapt
 	// So client makes HTTP/2 requests
 	http2.ConfigureTransport(tr)
 
-	sess := session.Must(session.NewSession(&aws.Config{
-		Region:     aws.String(cfg.awsRegion),
-		MaxRetries: aws.Int(10),
-		HTTPClient: &http.Client{
-			Transport: tr,
-		},
-	}))
-
-	writeSvc := timestreamwrite.New(sess)
+	if writeSvc == nil {
+		writeSvc = timestreamwrite.New(
+			session.Must(
+				session.NewSession(
+					&aws.Config{
+						Region:     aws.String(cfg.awsRegion),
+						MaxRetries: aws.Int(10),
+						HTTPClient: &http.Client{
+							Transport: tr,
+						},
+					},
+				),
+			),
+		)
+	}
 
 	return TimeSteamAdapter{
 		logger:       logger,
