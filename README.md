@@ -1,7 +1,5 @@
 # prometheus-timestream-adapter
 
-:warning: **This is a very early version**: Be very careful here!
-
 Prometheus-timestream-adapter is a service which receives [Prometheus](https://github.com/prometheus) metrics through [`remote_write`](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write), and sends them into [AWS Timestream](https://aws.amazon.com/timestream).
 
 ## Building
