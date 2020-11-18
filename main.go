@@ -37,6 +37,9 @@ type config struct {
 	listenAddr    string
 	tableName     string
 	telemetryPath string
+	tlsCert       string
+	tlsKey        string
+	tls           bool
 }
 
 var (
@@ -83,6 +86,9 @@ func init() {
 	flag.StringVar(&cfg.listenAddr, "listenAddr", ":9201", "")
 	flag.StringVar(&cfg.tableName, "tableName", "prometheus-table", "")
 	flag.StringVar(&cfg.telemetryPath, "telemetryPath", "/metric", "")
+	flag.StringVar(&cfg.tlsCert, "tlsCert", "tls.cert", "")
+	flag.StringVar(&cfg.tlsKey, "tlsKey", "tls.key", "")
+	flag.BoolVar(&cfg.tls, "tls", false, "")
 
 	flag.Parse()
 }
@@ -114,6 +120,10 @@ type adapter interface {
 func serve(logger *zap.SugaredLogger, addr string, ad adapter) error {
 	http.Handle(cfg.telemetryPath, promhttp.Handler())
 	http.Handle("/write", writeHandler(logger, ad))
+
+	if cfg.tls {
+		return http.ListenAndServeTLS(addr, cfg.tlsCert, cfg.tlsKey, nil)
+	}
 
 	return http.ListenAndServe(addr, nil)
 }
