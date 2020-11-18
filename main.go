@@ -88,7 +88,9 @@ func init() {
 }
 
 func main() {
-	sugarLogger, err := zap.NewProduction()
+	zapConfig := zap.NewProductionConfig()
+	zapConfig.DisableStacktrace = true
+	sugarLogger, err := zapConfig.Build()
 
 	if err != nil {
 		log.Fatalf("Error: %v", err)
