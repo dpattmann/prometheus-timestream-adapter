@@ -23,9 +23,12 @@ remote_write:
   - url: "http://prometheus-timestream-adapter:9201/write"
 ```
 
-### Why is there no remote_reader?
+:warning: **There is a very early remote_reader version!** [AWS Timestream](https://aws.amazon.com/timestream) has a very powerful [query language](https://docs.aws.amazon.com/timestream/latest/developerguide/reference.html) and there is a [Grafana Plugin](https://grafana.com/grafana/plugins/grafana-timestream-datasource) supporting Timestream as a datasource. However, there is a very basic reader implementation.
 
-[AWS Timestream](https://aws.amazon.com/timestream) has a very powerful [query language](https://docs.aws.amazon.com/timestream/latest/developerguide/reference.html) and there is a [Grafana Plugin](https://grafana.com/grafana/plugins/grafana-timestream-datasource) supporting Timestream as a datasource. However, this is the reason why I don't think a reader implementation is needed.
+```yaml
+remote_read:
+  - url: "http://prometheus-timestream-adapter:9201/read"
+```
 
 ## FAQ
 

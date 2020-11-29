@@ -19,13 +19,12 @@
 package main
 
 import (
-	"io/ioutil"
-	"net/http"
-
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
 	"go.uber.org/zap"
+	"io/ioutil"
+	"net/http"
 )
 
 func writeHandler(logger *zap.SugaredLogger, ad adapter) http.HandlerFunc {
@@ -51,14 +50,58 @@ func writeHandler(logger *zap.SugaredLogger, ad adapter) http.HandlerFunc {
 			return
 		}
 
-		records := protoToRecords(logger, &req)
-		receivedSamples.Add(float64(len(records)))
-
-		err = sendRecords(logger, ad, records)
+		err = ad.Write(&req)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("Error writing to AWS Timestream"))
+		}
+	}
+}
+
+func readHandler(logger *zap.SugaredLogger, ad adapter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		compressed, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			logger.Errorw("Read error", "err", err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		reqBuf, err := snappy.Decode(nil, compressed)
+		if err != nil {
+			logger.Errorw("Decode error", "err", err.Error())
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var req prompb.ReadRequest
+		if err := proto.Unmarshal(reqBuf, &req); err != nil {
+			logger.Errorw("Unmarshal error", "err", err.Error())
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		var resp *prompb.ReadResponse
+		resp, err = ad.Read(&req)
+		if err != nil {
+			logger.Warnw("Error executing query", "query", req, "err", err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		data, err := proto.Marshal(resp)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/x-protobuf")
+		w.Header().Set("Content-Encoding", "snappy")
+
+		compressed = snappy.Encode(nil, data)
+		if _, err := w.Write(compressed); err != nil {
+			logger.Warn("Error writing response", "err", err)
 		}
 	}
 }

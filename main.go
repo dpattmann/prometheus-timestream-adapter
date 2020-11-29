@@ -19,16 +19,15 @@
 package main
 
 import (
+	"go.uber.org/zap"
 	"log"
 	"net/http"
 	"os"
-	"time"
 
-	"github.com/aws/aws-sdk-go/service/timestreamwrite"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/prometheus/prompb"
 	flag "github.com/spf13/pflag"
-	"go.uber.org/zap"
 )
 
 type config struct {
@@ -40,6 +39,7 @@ type config struct {
 	tlsCert       string
 	tlsKey        string
 	tls           bool
+	debug         bool
 }
 
 var (
@@ -89,6 +89,7 @@ func init() {
 	flag.StringVar(&cfg.tlsCert, "tlsCert", "tls.cert", "")
 	flag.StringVar(&cfg.tlsKey, "tlsKey", "tls.key", "")
 	flag.BoolVar(&cfg.tls, "tls", false, "")
+	flag.BoolVar(&cfg.debug, "debug", false, "")
 
 	flag.Parse()
 }
@@ -96,6 +97,11 @@ func init() {
 func main() {
 	zapConfig := zap.NewProductionConfig()
 	zapConfig.DisableStacktrace = true
+
+	if cfg.debug {
+		zapConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	}
+
 	sugarLogger, err := zapConfig.Build()
 
 	if err != nil {
@@ -105,39 +111,27 @@ func main() {
 	defer sugarLogger.Sync() // flushes buffer, if any
 	sugar := sugarLogger.Sugar()
 
-	timeStreamAdapter := newTimeStreamAdapter(sugar, cfg, nil)
-	if err := serve(sugar, cfg.listenAddr, timeStreamAdapter); err != nil {
+	timeStreamAdapter := newTimeStreamAdapter(sugar, cfg, nil, nil)
+	if err := serve(sugar, cfg.listenAddr, &timeStreamAdapter); err != nil {
 		sugar.Errorw("Failed to listen", "addr", cfg.listenAddr, "err", err)
 		os.Exit(1)
 	}
 }
 
 type adapter interface {
-	Write(records []*timestreamwrite.Record) error
+	Write(records *prompb.WriteRequest) error
+	Read(request *prompb.ReadRequest) (*prompb.ReadResponse, error)
 	Name() string
 }
 
 func serve(logger *zap.SugaredLogger, addr string, ad adapter) error {
 	http.Handle(cfg.telemetryPath, promhttp.Handler())
 	http.Handle("/write", writeHandler(logger, ad))
+	http.Handle("/read", readHandler(logger, ad))
 
 	if cfg.tls {
 		return http.ListenAndServeTLS(addr, cfg.tlsCert, cfg.tlsKey, nil)
 	}
 
 	return http.ListenAndServe(addr, nil)
-}
-
-func sendRecords(logger *zap.SugaredLogger, ad adapter, records []*timestreamwrite.Record) (err error) {
-	begin := time.Now()
-	err = ad.Write(records)
-	duration := time.Since(begin).Seconds()
-	if err != nil {
-		logger.Warnw("Error sending samples to remote storage", "err", err, "storage", ad.Name(), "num_samples", len(records))
-		failedSamples.WithLabelValues(ad.Name()).Add(float64(len(records)))
-	}
-	sentSamples.WithLabelValues(ad.Name()).Add(float64(len(records)))
-	sentBatchDuration.WithLabelValues(ad.Name()).Observe(duration)
-
-	return
 }

@@ -29,6 +29,10 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	mockAdapter = newTimeStreamAdapter(zap.NewNop().Sugar(), cfg, TimeStreamWriterMock{}, TimeStreamQueryMock{})
+)
+
 func Test_readLabels(t *testing.T) {
 	type args struct {
 		labels []*prompb.Label
@@ -64,7 +68,7 @@ func Test_readLabels(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotDimensions, gotMeasureName := readLabels(tt.args.labels)
+			gotDimensions, gotMeasureName := mockAdapter.readLabels(tt.args.labels)
 			if !reflect.DeepEqual(gotDimensions, tt.wantDimensions) {
 				t.Errorf("readLabels() gotDimensions = %v, want %v", gotDimensions, tt.wantDimensions)
 			}
@@ -241,7 +245,7 @@ func Test_protoToRecords(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if gotRecords := protoToRecords(zap.NewNop().Sugar(), tt.args.req); !reflect.DeepEqual(gotRecords, tt.wantRecords) {
+			if gotRecords := mockAdapter.protoToRecords(tt.args.req); !reflect.DeepEqual(gotRecords, tt.wantRecords) {
 				t.Errorf("protoToRecords() = %v, want %v", gotRecords, tt.wantRecords)
 			}
 		})

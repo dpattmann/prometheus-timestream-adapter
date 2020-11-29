@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/timestreamquery/timestreamqueryiface"
 	"github.com/aws/aws-sdk-go/service/timestreamwrite"
 	"github.com/aws/aws-sdk-go/service/timestreamwrite/timestreamwriteiface"
 	"github.com/gogo/protobuf/proto"
@@ -37,6 +38,10 @@ import (
 
 type TimeStreamWriterMock struct {
 	timestreamwriteiface.TimestreamWriteAPI
+}
+
+type TimeStreamQueryMock struct {
+	timestreamqueryiface.TimestreamQueryAPI
 }
 
 func (t TimeStreamWriterMock) WriteRecords(input *timestreamwrite.WriteRecordsInput) (*timestreamwrite.WriteRecordsOutput, error) {
@@ -118,8 +123,8 @@ func Test_writeHandler(t *testing.T) {
 			assert.NoError(t, err)
 
 			rr := httptest.NewRecorder()
-			ad := newTimeStreamAdapter(zap.NewNop().Sugar(), cfg, TimeStreamWriterMock{})
-			writeHandler(zap.NewNop().Sugar(), ad).ServeHTTP(rr, req)
+			ad := newTimeStreamAdapter(zap.NewNop().Sugar(), cfg, TimeStreamWriterMock{}, TimeStreamQueryMock{})
+			writeHandler(zap.NewNop().Sugar(), &ad).ServeHTTP(rr, req)
 
 			assert.Equal(t, tt.want, rr.Code)
 		})
