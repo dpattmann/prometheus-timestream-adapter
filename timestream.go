@@ -132,6 +132,10 @@ func (t TimeSteamAdapter) readDimension(measureName string) (dimensions []string
 		return
 	}
 
+	if len(queryOutput.Rows) == 0 {
+		return nil, errors.New("No measure found")
+	}
+
 	for i, q := range queryOutput.ColumnInfo {
 		if *q.Name == "dimensions" {
 			for _, rv := range queryOutput.Rows[0].Data[i].ArrayValue {
