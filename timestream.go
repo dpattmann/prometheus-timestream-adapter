@@ -100,9 +100,9 @@ func (t *TimeSteamAdapter) buildQuery(q *prompb.Query) (task *queryTask, err err
 		case prompb.LabelMatcher_NEQ:
 			matchers = append(matchers, fmt.Sprintf("%s != '%s'", m.Name, m.Value))
 		case prompb.LabelMatcher_RE:
-			matchers = append(matchers, fmt.Sprintf("%s LIKE '%s'", m.Name, m.Value))
+			matchers = append(matchers, fmt.Sprintf("regexp_like(%s, '%s')", m.Name, m.Value))
 		case prompb.LabelMatcher_NRE:
-			matchers = append(matchers, fmt.Sprintf("%s NOT LIKE '%s'", m.Name, m.Value))
+			matchers = append(matchers, fmt.Sprintf("NOT regexp_like(%s, '%s')", m.Name, m.Value))
 		default:
 			return nil, errors.Errorf("unknown match type %v", m.Type)
 		}
@@ -201,12 +201,12 @@ func (t TimeSteamAdapter) query(q *prompb.Query) (result prompb.QueryResult, err
 		QueryString: &task.query,
 	}
 
-	out, err := t.ttq.Query(input)
+	queryOutput, err := t.ttq.Query(input)
 	if err != nil {
 		return
 	}
 
-	timeSeries, err := t.handleQueryResult(out, task.measureName)
+	timeSeries, err := t.handleQueryResult(queryOutput, task.measureName)
 
 	if err != nil {
 		return
@@ -231,7 +231,6 @@ func (t *TimeSteamAdapter) Read(request *prompb.ReadRequest) (response *prompb.R
 		}
 
 		queryResults = append(queryResults, &queryResult)
-
 	}
 
 	response = &prompb.ReadResponse{
