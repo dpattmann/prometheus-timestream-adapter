@@ -27,7 +27,7 @@ import (
 	"net/http"
 )
 
-func writeHandler(logger *zap.SugaredLogger, ad adapter) http.HandlerFunc {
+func writeHandler(logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		compressed, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -59,7 +59,7 @@ func writeHandler(logger *zap.SugaredLogger, ad adapter) http.HandlerFunc {
 	}
 }
 
-func readHandler(logger *zap.SugaredLogger, ad adapter) http.HandlerFunc {
+func readHandler(logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		compressed, err := ioutil.ReadAll(r.Body)
 		if err != nil {

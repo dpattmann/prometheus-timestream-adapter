@@ -121,22 +121,22 @@ func main() {
 	sugar := sugarLogger.Sugar()
 
 	timeStreamAdapter := newTimeStreamAdapter(sugar, cfg, nil, nil)
-	if err := serve(sugar, cfg.listenAddr, &timeStreamAdapter); err != nil {
+	if err := serve(sugar, cfg.listenAddr, timeStreamAdapter); err != nil {
 		sugar.Errorw("Failed to listen", "addr", cfg.listenAddr, "err", err)
 		os.Exit(1)
 	}
 }
 
-type adapter interface {
+type PrometheusRemoteStorageAdapter interface {
 	Write(records *prompb.WriteRequest) error
 	Read(request *prompb.ReadRequest) (*prompb.ReadResponse, error)
 	Name() string
 }
 
-func serve(logger *zap.SugaredLogger, addr string, ad adapter) error {
+func serve(logger *zap.SugaredLogger, addr string, storageAdapter PrometheusRemoteStorageAdapter) error {
 	http.Handle(cfg.telemetryPath, promhttp.Handler())
-	http.Handle("/write", writeHandler(logger, ad))
-	http.Handle("/read", readHandler(logger, ad))
+	http.Handle("/write", writeHandler(logger, storageAdapter))
+	http.Handle("/read", readHandler(logger, storageAdapter))
 
 	if cfg.tls {
 		return http.ListenAndServeTLS(addr, cfg.tlsCert, cfg.tlsKey, nil)
