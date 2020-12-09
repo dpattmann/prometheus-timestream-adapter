@@ -34,12 +34,12 @@ type config struct {
 	awsRegion     string
 	databaseName  string
 	listenAddr    string
+	logLevel      string
 	tableName     string
 	telemetryPath string
+	tls           bool
 	tlsCert       string
 	tlsKey        string
-	tls           bool
-	debug         bool
 }
 
 var (
@@ -76,20 +76,20 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(receivedSamples)
-	prometheus.MustRegister(sentSamples)
 	prometheus.MustRegister(failedSamples)
+	prometheus.MustRegister(receivedSamples)
 	prometheus.MustRegister(sentBatchDuration)
+	prometheus.MustRegister(sentSamples)
 
+	flag.BoolVar(&cfg.tls, "tls", false, "")
 	flag.StringVar(&cfg.awsRegion, "awsRegion", "eu-central-1", "")
 	flag.StringVar(&cfg.databaseName, "databaseName", "prometheus-database", "")
 	flag.StringVar(&cfg.listenAddr, "listenAddr", ":9201", "")
+	flag.StringVar(&cfg.logLevel, "logLevel", "error", "")
 	flag.StringVar(&cfg.tableName, "tableName", "prometheus-table", "")
 	flag.StringVar(&cfg.telemetryPath, "telemetryPath", "/metric", "")
 	flag.StringVar(&cfg.tlsCert, "tlsCert", "tls.cert", "")
 	flag.StringVar(&cfg.tlsKey, "tlsKey", "tls.key", "")
-	flag.BoolVar(&cfg.tls, "tls", false, "")
-	flag.BoolVar(&cfg.debug, "debug", false, "")
 
 	flag.Parse()
 }
@@ -98,8 +98,17 @@ func main() {
 	zapConfig := zap.NewProductionConfig()
 	zapConfig.DisableStacktrace = true
 
-	if cfg.debug {
+	switch cfg.logLevel {
+	case "warning":
+		zapConfig.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
+	case "error":
+		zapConfig.Level = zap.NewAtomicLevelAt(zap.ErrorLevel)
+	case "info":
+		zapConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+	case "debug":
 		zapConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	default:
+		os.Exit(1)
 	}
 
 	sugarLogger, err := zapConfig.Build()
