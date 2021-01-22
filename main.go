@@ -19,10 +19,11 @@
 package main
 
 import (
-	"go.uber.org/zap"
 	"log"
 	"net/http"
 	"os"
+
+	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

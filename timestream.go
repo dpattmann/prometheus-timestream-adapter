@@ -44,11 +44,11 @@ import (
 )
 
 type TimeStreamAdapter struct {
+	databaseName string
 	logger       *zap.SugaredLogger
 	tableName    string
-	databaseName string
-	ttw          timestreamwriteiface.TimestreamWriteAPI
-	ttq          timestreamqueryiface.TimestreamQueryAPI
+	timestreamqueryiface.TimestreamQueryAPI
+	timestreamwriteiface.TimestreamWriteAPI
 }
 
 type queryTask struct {
@@ -100,11 +100,11 @@ func newTimeStreamAdapter(logger *zap.SugaredLogger, cfg *config, writeSvc times
 	}
 
 	return TimeStreamAdapter{
-		logger:       logger,
-		databaseName: cfg.databaseName,
-		tableName:    cfg.tableName,
-		ttw:          writeSvc,
-		ttq:          readSvc,
+		TimestreamQueryAPI: readSvc,
+		TimestreamWriteAPI: writeSvc,
+		databaseName:       cfg.databaseName,
+		logger:             logger,
+		tableName:          cfg.tableName,
 	}
 }
 
@@ -121,7 +121,7 @@ func (t TimeStreamAdapter) Write(req *prompb.WriteRequest) (err error) {
 	records := t.toRecords(req)
 	receivedSamples.Add(float64(len(records)))
 
-	_, err = t.ttw.WriteRecords(&timestreamwrite.WriteRecordsInput{
+	_, err = t.WriteRecords(&timestreamwrite.WriteRecordsInput{
 		DatabaseName: aws.String(t.databaseName),
 		TableName:    aws.String(t.tableName),
 		Records:      records,
@@ -169,7 +169,7 @@ func (t TimeStreamAdapter) Read(request *prompb.ReadRequest) (response *prompb.R
 	var queryResults []*prompb.QueryResult
 
 	for _, q := range request.Queries {
-		queryResult, err = t.runQuery(q)
+		queryResult, err = t.runReadRequestQuery(q)
 
 		if err != nil {
 			return
@@ -185,14 +185,14 @@ func (t TimeStreamAdapter) Read(request *prompb.ReadRequest) (response *prompb.R
 	return
 }
 
-func (t TimeStreamAdapter) runQuery(q *prompb.Query) (result prompb.QueryResult, err error) {
+func (t TimeStreamAdapter) runReadRequestQuery(q *prompb.Query) (result prompb.QueryResult, err error) {
 	task, err := t.buildTimeStreamQueryString(q)
 
 	if err != nil {
 		return
 	}
 
-	timeStreamQueryOutput, err := t.ttq.Query(&timestreamquery.QueryInput{
+	timeStreamQueryOutput, err := t.Query(&timestreamquery.QueryInput{
 		QueryString: &task.query,
 	})
 
@@ -213,7 +213,7 @@ func (t TimeStreamAdapter) runQuery(q *prompb.Query) (result prompb.QueryResult,
 	return
 }
 
-// BuildCommand generates the proper SQL for the runQuery
+// BuildCommand generates the proper SQL for the runReadRequestQuery
 func (t TimeStreamAdapter) buildTimeStreamQueryString(q *prompb.Query) (task queryTask, err error) {
 	matchers := make([]string, 0, len(q.Matchers))
 	for _, m := range q.Matchers {
@@ -258,7 +258,7 @@ func (t TimeStreamAdapter) buildTimeStreamQueryString(q *prompb.Query) (task que
 	task.query = fmt.Sprintf("SELECT %s, CREATE_TIME_SERIES(time, measure_value::double) AS %s FROM \"%s\".\"%s\" WHERE %s GROUP BY %s",
 		strings.Join(dimensions, ", "), task.measureName, cfg.databaseName, cfg.tableName, strings.Join(matchers, " AND "), strings.Join(dimensions, ", "))
 
-	t.logger.Debugw("Timestream read", "runQuery", task.query)
+	t.logger.Debugw("Timestream read", "runReadRequestQuery", task.query)
 
 	return
 }
@@ -266,7 +266,7 @@ func (t TimeStreamAdapter) buildTimeStreamQueryString(q *prompb.Query) (task que
 func (t TimeStreamAdapter) readDimension(measureName string) (dimensions []string, err error) {
 	query := fmt.Sprintf("SHOW MEASURES FROM \"%s\".\"%s\" LIKE '%s'", cfg.databaseName, cfg.tableName, measureName)
 
-	queryOutput, err := t.ttq.Query(&timestreamquery.QueryInput{QueryString: &query})
+	queryOutput, err := t.Query(&timestreamquery.QueryInput{QueryString: &query})
 	if err != nil {
 		return
 	}

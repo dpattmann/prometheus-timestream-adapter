@@ -37,11 +37,11 @@ import (
 
 var (
 	timeStreamAdapter = &TimeStreamAdapter{
-		logger:       zap.NewNop().Sugar(),
-		tableName:    "mockTable",
-		databaseName: "mockDatabase",
-		ttw:          TimeStreamWriterMock{},
-		ttq:          TimeStreamQueryMock{},
+		TimestreamQueryAPI: TimeStreamQueryMock{},
+		TimestreamWriteAPI: TimeStreamWriterMock{},
+		databaseName:       "mockDatabase",
+		logger:             zap.NewNop().Sugar(),
+		tableName:          "mockTable",
 	}
 
 	measureOutput = &timestreamquery.QueryOutput{

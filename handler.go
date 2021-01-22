@@ -85,7 +85,7 @@ func readHandler(logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) h
 		var resp *prompb.ReadResponse
 		resp, err = ad.Read(&req)
 		if err != nil {
-			logger.Warnw("Error executing query", "query", req, "err", err.Error())
+			logger.Errorw("Error executing query", "query", req, "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -101,7 +101,7 @@ func readHandler(logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) h
 
 		compressed = snappy.Encode(nil, data)
 		if _, err := w.Write(compressed); err != nil {
-			logger.Warn("Error writing response", "err", err)
+			logger.Errorw("Error writing response", "err", err)
 		}
 	}
 }
