@@ -43,6 +43,8 @@ import (
 	"golang.org/x/net/http2"
 )
 
+const TimestreamMaxRecordsPerRequest = 100
+
 type TimeStreamAdapter struct {
 	databaseName string
 	logger       *zap.SugaredLogger
@@ -121,15 +123,17 @@ func (t TimeStreamAdapter) Write(req *prompb.WriteRequest) (err error) {
 	records := t.toRecords(req)
 	receivedSamples.Add(float64(len(records)))
 
-	_, err = t.WriteRecords(&timestreamwrite.WriteRecordsInput{
-		DatabaseName: aws.String(t.databaseName),
-		TableName:    aws.String(t.tableName),
-		Records:      records,
-	})
+	for _, chunk := range t.splitRecords(records) {
+		_, err = t.WriteRecords(&timestreamwrite.WriteRecordsInput{
+			DatabaseName: aws.String(t.databaseName),
+			TableName:    aws.String(t.tableName),
+			Records:      chunk,
+		})
 
-	if err != nil {
-		t.logger.Warnw("Error sending samples to remote storage", "err", err, "storage", t.Name(), "num_samples", len(records))
-		failedSamples.WithLabelValues(t.Name()).Add(float64(len(records)))
+		if err != nil {
+			t.logger.Warnw("Error sending samples to remote storage", "err", err, "storage", t.Name(), "num_samples", len(chunk))
+			failedSamples.WithLabelValues(t.Name()).Add(float64(len(chunk)))
+		}
 	}
 	sentSamples.WithLabelValues(t.Name()).Add(float64(len(records)))
 
@@ -160,6 +164,21 @@ func (t TimeStreamAdapter) toRecords(writeRequest *prompb.WriteRequest) (records
 	}
 
 	return
+}
+
+func (t TimeStreamAdapter) splitRecords(records []*timestreamwrite.Record) [][]*timestreamwrite.Record{
+	var chunked [][]*timestreamwrite.Record
+
+	for i := 0; i < len(records); i+= TimestreamMaxRecordsPerRequest {
+		end := i + TimestreamMaxRecordsPerRequest
+		if end > len(records){
+			end = len(records)
+		}
+
+		chunked = append(chunked, records[i:end])
+	}
+	t.logger.Debugf("Successfully split %d records into %d chunks", len(records), len(chunked))
+	return chunked
 }
 
 // Read implementation
