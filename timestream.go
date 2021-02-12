@@ -166,12 +166,12 @@ func (t TimeStreamAdapter) toRecords(writeRequest *prompb.WriteRequest) (records
 	return
 }
 
-func (t TimeStreamAdapter) splitRecords(records []*timestreamwrite.Record) [][]*timestreamwrite.Record{
+func (t TimeStreamAdapter) splitRecords(records []*timestreamwrite.Record) [][]*timestreamwrite.Record {
 	var chunked [][]*timestreamwrite.Record
 
-	for i := 0; i < len(records); i+= TimestreamMaxRecordsPerRequest {
+	for i := 0; i < len(records); i += TimestreamMaxRecordsPerRequest {
 		end := i + TimestreamMaxRecordsPerRequest
-		if end > len(records){
+		if end > len(records) {
 			end = len(records)
 		}
 
