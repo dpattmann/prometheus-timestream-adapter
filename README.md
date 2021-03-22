@@ -30,11 +30,40 @@ remote_read:
   - url: "http://prometheus-timestream-adapter:9201/read"
 ```
 
+## Access Prometheus Timestream Database
+
+The [Session](https://pkg.go.dev/github.com/aws/aws-sdk-go/aws/session) will attempt to load configuration and credentials from the environment, configuration files, and other credential sources.
+
+### AWS Policy
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowReadWriteToTable",
+            "Effect": "Allow",
+            "Action": [
+                "timestream:WriteRecords",
+                "timestream:Select"
+            ],
+            "Resource": "arn:aws:timestream:region:AccoundId:database/DatabaseName/table/TableName"
+        },
+        {
+            "Sid": "AllowValueRead",
+            "Effect": "Allow",
+            "Action": "timestream:SelectValues",
+            "Resource": "*"
+        }
+    ]
+}
+```
+
 ## FAQ
 
 ### What does the warning `Measure name exceeds the maximum supported length` mean?
 
-The maximum number of characters for an AWS Timestream Dimension name is 256 bytes. If a metric name is bigger than that it can't be written to AWS Timestream.
+The maximum number of characters for an AWS Timestream Dimension name is 256 bytes. Is a metric name is bigger than that it can't be written to AWS Timestream.
 
 [Timestream Quotas](https://docs.aws.amazon.com/timestream/latest/developerguide/ts-limits.html)
   
