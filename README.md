@@ -50,6 +50,12 @@ The [Session](https://pkg.go.dev/github.com/aws/aws-sdk-go/aws/session) will att
             "Resource": "arn:aws:timestream:region:AccoundId:database/DatabaseName/table/TableName"
         },
         {
+            "Sid": "AllowDescribeEndpoints",
+            "Effect": "Allow",
+            "Action": "timestream:DescribeEndpoints",
+            "Resource": "*"
+        },
+        {
             "Sid": "AllowValueRead",
             "Effect": "Allow",
             "Action": "timestream:SelectValues",
