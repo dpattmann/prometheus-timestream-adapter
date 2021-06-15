@@ -140,6 +140,19 @@ func (t TimeStreamAdapter) Write(req *prompb.WriteRequest) (err error) {
 	return
 }
 
+func allCharactersValid(str string) bool {
+	isValid := func(char rune) bool {
+		return (char >= 'A' && char <= 'Z') || (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') ||
+			char == '_' || char == '-' || char == '.'
+	}
+	for _, char := range str {
+		if !isValid(char) {
+			return false
+		}
+	}
+	return true
+}
+
 func (t TimeStreamAdapter) toRecords(writeRequest *prompb.WriteRequest) (records []*timestreamwrite.Record) {
 	for _, ts := range writeRequest.Timeseries {
 		task := t.readLabels(ts.Labels)
@@ -149,6 +162,9 @@ func (t TimeStreamAdapter) toRecords(writeRequest *prompb.WriteRequest) (records
 				continue
 			case len(task.measureName) >= 62:
 				t.logger.Warnw("Measure name exceeds the maximum supported length", "Measure name", task.measureName, "Length", len(task.measureName))
+				continue
+			case !allCharactersValid(task.measureName):
+				t.logger.Warnw("Measure name contains illegal characters", "Measure name", task.measureName)
 				continue
 			}
 
