@@ -32,6 +32,7 @@ import (
 )
 
 type config struct {
+	help          bool
 	awsRegion     string
 	databaseName  string
 	listenAddr    string
@@ -82,6 +83,7 @@ func init() {
 	prometheus.MustRegister(sentBatchDuration)
 	prometheus.MustRegister(sentSamples)
 
+	flag.BoolVar(&cfg.help, "help", false, "")
 	flag.BoolVar(&cfg.tls, "tls", false, "")
 	flag.StringVar(&cfg.awsRegion, "awsRegion", "eu-central-1", "")
 	flag.StringVar(&cfg.databaseName, "databaseName", "prometheus-database", "")
@@ -96,6 +98,11 @@ func init() {
 }
 
 func main() {
+	if cfg.help {
+		flag.PrintDefaults()
+		return
+	}
+
 	zapConfig := zap.NewProductionConfig()
 	zapConfig.DisableStacktrace = true
 

@@ -13,6 +13,21 @@ go build
 ```
 go test
 ```
+## Command line options
+
+```bash
+Usage of ./prometheus-timestream-adapter:
+      --awsRegion string        (default "eu-central-1")
+      --databaseName string     (default "prometheus-database")
+      --help                   
+      --listenAddr string       (default ":9201")
+      --logLevel string         (default "error")
+      --tableName string        (default "prometheus-table")
+      --telemetryPath string    (default "/metric")
+      --tls                    
+      --tlsCert string          (default "tls.cert")
+      --tlsKey string           (default "tls.key")
+```
 
 ## Configuring Prometheus
 
