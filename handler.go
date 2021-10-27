@@ -105,3 +105,14 @@ func readHandler(logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) h
 		}
 	}
 }
+
+func healthHandler(logger *zap.SugaredLogger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Header().Set("Content-Encoding", "UTF-8")
+
+		if _, err := w.Write([]byte("Ok")); err != nil {
+			logger.Errorw("Error writing response", "err", err)
+		}
+	}
+}
