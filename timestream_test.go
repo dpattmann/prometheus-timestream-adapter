@@ -105,26 +105,33 @@ var (
 		},
 	}
 
-	queryOutput = &timestreamquery.QueryOutput{
-		ColumnInfo: []*timestreamquery.ColumnInfo{
-			{
-				Name: aws.String("instance"),
-				Type: &timestreamquery.Type{ScalarType: aws.String("VARCHAR")},
-			},
-			{
-				Name: aws.String("job"),
-				Type: &timestreamquery.Type{ScalarType: aws.String("VARCHAR")},
-			},
-			{
-				Name: aws.String("mock"),
-				Type: &timestreamquery.Type{
-					TimeSeriesMeasureValueColumnInfo: &timestreamquery.ColumnInfo{
-						Type: &timestreamquery.Type{ScalarType: aws.String("DOUBLE")},
-					},
+	queryOutputColumns = []*timestreamquery.ColumnInfo{
+		{
+			Name: aws.String("instance"),
+			Type: &timestreamquery.Type{ScalarType: aws.String("VARCHAR")},
+		},
+		{
+			Name: aws.String("job"),
+			Type: &timestreamquery.Type{ScalarType: aws.String("VARCHAR")},
+		},
+		{
+			Name: aws.String("mock"),
+			Type: &timestreamquery.Type{
+				TimeSeriesMeasureValueColumnInfo: &timestreamquery.ColumnInfo{
+					Type: &timestreamquery.Type{ScalarType: aws.String("DOUBLE")},
 				},
 			},
 		},
-		QueryId: aws.String("MOCK"),
+	}
+
+	queryOutput0 = &timestreamquery.QueryOutput{
+		ColumnInfo: queryOutputColumns,
+		QueryId:    aws.String("MOCK"),
+	}
+
+	queryOutput1 = &timestreamquery.QueryOutput{
+		ColumnInfo: queryOutputColumns,
+		QueryId:    aws.String("MOCK"),
 		Rows: []*timestreamquery.Row{
 			{
 				Data: []*timestreamquery.Datum{
@@ -135,6 +142,27 @@ var (
 							{
 								Time:  aws.String("2020-01-01 00:00:00.000000000"),
 								Value: &timestreamquery.Datum{ScalarValue: aws.String("1.0")},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	queryOutput2 = &timestreamquery.QueryOutput{
+		ColumnInfo: queryOutputColumns,
+		QueryId:    aws.String("MOCK"),
+		Rows: []*timestreamquery.Row{
+			{
+				Data: []*timestreamquery.Datum{
+					{ScalarValue: aws.String("host:9100")},
+					{ScalarValue: aws.String("mock-exporter")},
+					{
+						TimeSeriesValue: []*timestreamquery.TimeSeriesDataPoint{
+							{
+								Time:  aws.String("2020-01-01 00:00:01.000000000"),
+								Value: &timestreamquery.Datum{ScalarValue: aws.String("2.0")},
 							},
 						},
 					},
@@ -166,9 +194,16 @@ func (t TimeStreamQueryMock) Query(input *timestreamquery.QueryInput) (output *t
 	case "SHOW MEASURES FROM \"prometheus-database\".\"prometheus-table\" LIKE 'mock'":
 		output = measureOutput
 	case "SELECT instance, job, CREATE_TIME_SERIES(time, measure_value::double) AS mock FROM \"prometheus-database\".\"prometheus-table\" WHERE measure_name = 'mock' AND time BETWEEN from_milliseconds(1577836800000) AND from_milliseconds(1577836800000) GROUP BY instance, job":
-		output = queryOutput
+		output = queryOutput1
 	}
 
+	return
+}
+
+func (t TimeStreamQueryMock) QueryPages(input *timestreamquery.QueryInput, handler func(*timestreamquery.QueryOutput, bool) bool) (err error) {
+	handler(queryOutput0, false)
+	handler(queryOutput1, false)
+	handler(queryOutput2, true)
 	return
 }
 
@@ -510,6 +545,28 @@ func TestTimeSteamAdapter_Read(t *testing.T) {
 									{
 										Value:     1.0,
 										Timestamp: 1577836800000,
+									},
+								},
+							},
+							{
+								Labels: []*prompb.Label{
+									{
+										Name:  "__name__",
+										Value: "mock",
+									},
+									{
+										Name:  "instance",
+										Value: "host:9100",
+									},
+									{
+										Name:  "job",
+										Value: "mock-exporter",
+									},
+								},
+								Samples: []prompb.Sample{
+									{
+										Value:     2.0,
+										Timestamp: 1577836801000,
 									},
 								},
 							},

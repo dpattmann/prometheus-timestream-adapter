@@ -227,15 +227,26 @@ func (t TimeStreamAdapter) runReadRequestQuery(q *prompb.Query) (result prompb.Q
 		return
 	}
 
-	timeStreamQueryOutput, err := t.Query(&timestreamquery.QueryInput{
-		QueryString: &task.query,
-	})
+	var timeSeries []*prompb.TimeSeries
+	var innerErr error
+	err = t.QueryPages(
+		&timestreamquery.QueryInput{
+			QueryString: &task.query,
+		},
+		func(output *timestreamquery.QueryOutput, lastPage bool) (continueIterating bool) {
+			continueIterating = true
+			timeSeries, innerErr = t.handleQueryResult(output, timeSeries, task.measureName)
+			return
+		},
+	)
 
 	if err != nil {
 		return
 	}
 
-	timeSeries, err := t.handleQueryResult(timeStreamQueryOutput, task.measureName)
+	if innerErr != nil {
+		return result, innerErr
+	}
 
 	if err != nil {
 		return
@@ -340,7 +351,8 @@ func (t TimeStreamAdapter) readLabels(labels []*prompb.Label) (task writeTask) {
 	return
 }
 
-func (t TimeStreamAdapter) handleQueryResult(qo *timestreamquery.QueryOutput, measureName string) (timeSeries []*prompb.TimeSeries, err error) {
+func (t TimeStreamAdapter) handleQueryResult(qo *timestreamquery.QueryOutput, timeSeries []*prompb.TimeSeries, measureName string) ([]*prompb.TimeSeries, error) {
+	var err error
 	for _, row := range qo.Rows {
 		var ts prompb.TimeSeries
 
@@ -364,7 +376,6 @@ func (t TimeStreamAdapter) handleQueryResult(qo *timestreamquery.QueryOutput, me
 					}
 
 					s, err := time.Parse("2006-01-02 15:04:05.999999999", *p.Time)
-
 					if err != nil {
 						continue
 					}
@@ -381,5 +392,5 @@ func (t TimeStreamAdapter) handleQueryResult(qo *timestreamquery.QueryOutput, me
 		timeSeries = append(timeSeries, &ts)
 	}
 
-	return
+	return timeSeries, err
 }
