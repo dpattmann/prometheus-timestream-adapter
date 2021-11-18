@@ -140,6 +140,19 @@ func (t TimeStreamAdapter) Write(req *prompb.WriteRequest) (err error) {
 	return
 }
 
+func (t TimeStreamAdapter) allCharactersValid(str string) bool {
+	isValid := func(char rune) bool {
+		return (char >= 'A' && char <= 'Z') || (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') ||
+			char == '_' || char == '-' || char == '.'
+	}
+	for _, char := range str {
+		if !isValid(char) {
+			return false
+		}
+	}
+	return true
+}
+
 func (t TimeStreamAdapter) toRecords(writeRequest *prompb.WriteRequest) (records []*timestreamwrite.Record) {
 	for _, ts := range writeRequest.Timeseries {
 		task := t.readLabels(ts.Labels)
@@ -149,6 +162,9 @@ func (t TimeStreamAdapter) toRecords(writeRequest *prompb.WriteRequest) (records
 				continue
 			case len(task.measureName) >= 62:
 				t.logger.Warnw("Measure name exceeds the maximum supported length", "Measure name", task.measureName, "Length", len(task.measureName))
+				continue
+			case !t.allCharactersValid(task.measureName):
+				t.logger.Warnw("Measure name contains illegal characters", "Measure name", task.measureName)
 				continue
 			}
 
@@ -211,15 +227,25 @@ func (t TimeStreamAdapter) runReadRequestQuery(q *prompb.Query) (result prompb.Q
 		return
 	}
 
-	timeStreamQueryOutput, err := t.Query(&timestreamquery.QueryInput{
-		QueryString: &task.query,
-	})
+	var timeSeries []*prompb.TimeSeries
+	var innerErr error
+	err = t.QueryPages(
+		&timestreamquery.QueryInput{
+			QueryString: &task.query,
+		},
+		func(output *timestreamquery.QueryOutput, lastPage bool) bool {
+			timeSeries, innerErr = t.handleQueryResult(output, timeSeries, task.measureName)
+			return !lastPage
+		},
+	)
 
 	if err != nil {
 		return
 	}
 
-	timeSeries, err := t.handleQueryResult(timeStreamQueryOutput, task.measureName)
+	if innerErr != nil {
+		return result, innerErr
+	}
 
 	if err != nil {
 		return
@@ -324,7 +350,8 @@ func (t TimeStreamAdapter) readLabels(labels []*prompb.Label) (task writeTask) {
 	return
 }
 
-func (t TimeStreamAdapter) handleQueryResult(qo *timestreamquery.QueryOutput, measureName string) (timeSeries []*prompb.TimeSeries, err error) {
+func (t TimeStreamAdapter) handleQueryResult(qo *timestreamquery.QueryOutput, timeSeries []*prompb.TimeSeries, measureName string) ([]*prompb.TimeSeries, error) {
+	var err error
 	for _, row := range qo.Rows {
 		var ts prompb.TimeSeries
 
@@ -348,7 +375,6 @@ func (t TimeStreamAdapter) handleQueryResult(qo *timestreamquery.QueryOutput, me
 					}
 
 					s, err := time.Parse("2006-01-02 15:04:05.999999999", *p.Time)
-
 					if err != nil {
 						continue
 					}
@@ -365,5 +391,5 @@ func (t TimeStreamAdapter) handleQueryResult(qo *timestreamquery.QueryOutput, me
 		timeSeries = append(timeSeries, &ts)
 	}
 
-	return
+	return timeSeries, err
 }
