@@ -44,7 +44,7 @@ jobs:
         uses: docker/metadata-action@v3
         with:
           images: |
-            dpattmann/furby
+            dpattmann/prometheus-timestream-adapter
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
