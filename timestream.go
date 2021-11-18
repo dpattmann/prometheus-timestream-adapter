@@ -234,7 +234,7 @@ func (t TimeStreamAdapter) runReadRequestQuery(q *prompb.Query) (result prompb.Q
 			QueryString: &task.query,
 		},
 		func(output *timestreamquery.QueryOutput, lastPage bool) (continueIterating bool) {
-			continueIterating = true
+			continueIterating = !lastPage
 			timeSeries, innerErr = t.handleQueryResult(output, timeSeries, task.measureName)
 			return
 		},
