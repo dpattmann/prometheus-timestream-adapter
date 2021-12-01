@@ -25,7 +25,7 @@ snapshot:
   name_template: "{{ incpatch .Version }}-next"
 
 changelog:
-  use: github-native
+  use: git
   sort: asc
   filters:
     exclude:
