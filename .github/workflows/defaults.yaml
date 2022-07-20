@@ -7,7 +7,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup go env
-        uses: actions/setup-go@v2.1.4
+        uses: actions/setup-go@v3.2.1
         with:
           go-version: '1.16'
       - name: Run tests
@@ -23,7 +23,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup go env
-        uses: actions/setup-go@v2.1.4
+        uses: actions/setup-go@v3.2.1
         with:
           go-version: '1.16'
       - name: Release new package on tag
