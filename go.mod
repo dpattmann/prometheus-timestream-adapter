@@ -12,6 +12,6 @@ require (
 	github.com/prometheus/common v0.37.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/spf13/pflag v1.0.5
-	go.uber.org/zap v1.21.0
+	go.uber.org/zap v1.22.0
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
 )
