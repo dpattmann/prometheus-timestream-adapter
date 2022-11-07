@@ -3,7 +3,7 @@ module github.com/dpattmann/prometheus-timestream-adapter
 go 1.16
 
 require (
-	github.com/aws/aws-sdk-go v1.44.126
+	github.com/aws/aws-sdk-go v1.44.131
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/snappy v0.0.4
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
@@ -13,5 +13,5 @@ require (
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/spf13/pflag v1.0.5
 	go.uber.org/zap v1.23.0
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
+	golang.org/x/net v0.1.0
 )
