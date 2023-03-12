@@ -128,6 +128,8 @@ func main() {
 	defer sugarLogger.Sync() // flushes buffer, if any
 	sugar := sugarLogger.Sugar()
 
+	sugar.Debugf("Sending logs to timeseries database %s in AWS Region %s", cfg.databaseName, cfg.awsRegion)
+
 	timeStreamAdapter := newTimeStreamAdapter(sugar, cfg, nil, nil)
 	if err := serve(sugar, cfg.listenAddr, timeStreamAdapter); err != nil {
 		sugar.Errorw("Failed to listen", "addr", cfg.listenAddr, "err", err)
@@ -148,8 +150,9 @@ func serve(logger *zap.SugaredLogger, addr string, storageAdapter PrometheusRemo
 	http.Handle("/health", healthHandler(logger))
 
 	if cfg.tls {
+		logger.Debugf("Listening on port %s with cert %s and key %s", addr, cfg.tlsCert, cfg.tlsKey)
 		return http.ListenAndServeTLS(addr, cfg.tlsCert, cfg.tlsKey, nil)
 	}
-
+	logger.Debugf("Listening on port %s", addr)
 	return http.ListenAndServe(addr, nil)
 }
