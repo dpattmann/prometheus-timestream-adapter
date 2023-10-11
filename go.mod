@@ -12,6 +12,6 @@ require (
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/spf13/pflag v1.0.5
 	go.uber.org/zap v1.26.0
-	golang.org/x/net v0.16.0
+	golang.org/x/net v0.17.0
 	google.golang.org/genproto v0.0.0-20220616135557-88e70c0c3a90 // indirect
 )
