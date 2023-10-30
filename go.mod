@@ -3,7 +3,7 @@ module github.com/dpattmann/prometheus-timestream-adapter
 go 1.16
 
 require (
-	github.com/aws/aws-sdk-go v1.45.25
+	github.com/aws/aws-sdk-go v1.46.6
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/snappy v0.0.4
 	github.com/pkg/errors v0.9.1
