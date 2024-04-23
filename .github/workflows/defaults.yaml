@@ -82,7 +82,7 @@ jobs:
           file: ./Dockerfile
           push-images: ${{ github.ref_name == 'master' || contains(needs.get-commit-message.outputs.message, '[push-image]') }}
           scan-images: false
-          image-tag: 'latest'
+          image-tag: ${{ steps.meta.outputs.tags }}
           tag-latest: ${{ github.ref_name == 'master' }}
 
       # - name: Login to DockerHub
