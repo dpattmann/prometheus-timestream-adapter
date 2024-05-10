@@ -209,7 +209,7 @@ func (t TimeStreamQueryMock) QueryPages(input *timestreamquery.QueryInput, handl
 
 func TestTimeSteamAdapter_readLabels(t *testing.T) {
 	type args struct {
-		labels []*prompb.Label
+		labels []prompb.Label
 	}
 	tests := []struct {
 		name     string
@@ -219,7 +219,7 @@ func TestTimeSteamAdapter_readLabels(t *testing.T) {
 		{
 			name: "Prom data request",
 			args: args{
-				labels: []*prompb.Label{
+				labels: []prompb.Label{
 					{
 						Name:  "__name__",
 						Value: "sample_metric",
@@ -263,9 +263,9 @@ func TestTimeSteamAdapter_toRecords(t *testing.T) {
 			name: "Prom data request",
 			args: args{
 				req: &prompb.WriteRequest{
-					Timeseries: []*prompb.TimeSeries{
+					Timeseries: []prompb.TimeSeries{
 						{
-							Labels: []*prompb.Label{
+							Labels: []prompb.Label{
 								{
 									Name:  "__name__",
 									Value: "sample_metric",
@@ -305,9 +305,9 @@ func TestTimeSteamAdapter_toRecords(t *testing.T) {
 			name: "Prom with NaN value",
 			args: args{
 				req: &prompb.WriteRequest{
-					Timeseries: []*prompb.TimeSeries{
+					Timeseries: []prompb.TimeSeries{
 						{
-							Labels: []*prompb.Label{
+							Labels: []prompb.Label{
 								{
 									Name:  "__name__",
 									Value: "sample_metric",
@@ -333,9 +333,9 @@ func TestTimeSteamAdapter_toRecords(t *testing.T) {
 			name: "Prom with positive inf number",
 			args: args{
 				req: &prompb.WriteRequest{
-					Timeseries: []*prompb.TimeSeries{
+					Timeseries: []prompb.TimeSeries{
 						{
-							Labels: []*prompb.Label{
+							Labels: []prompb.Label{
 								{
 									Name:  "__name__",
 									Value: "sample_metric",
@@ -361,9 +361,9 @@ func TestTimeSteamAdapter_toRecords(t *testing.T) {
 			name: "Prom with negative inf number",
 			args: args{
 				req: &prompb.WriteRequest{
-					Timeseries: []*prompb.TimeSeries{
+					Timeseries: []prompb.TimeSeries{
 						{
-							Labels: []*prompb.Label{
+							Labels: []prompb.Label{
 								{
 									Name:  "__name__",
 									Value: "sample_metric",
@@ -389,9 +389,9 @@ func TestTimeSteamAdapter_toRecords(t *testing.T) {
 			name: "Prom with long metric name",
 			args: args{
 				req: &prompb.WriteRequest{
-					Timeseries: []*prompb.TimeSeries{
+					Timeseries: []prompb.TimeSeries{
 						{
-							Labels: []*prompb.Label{
+							Labels: []prompb.Label{
 								{
 									Name:  "__name__",
 									Value: "sample_metric_measure_name_exceeds_the_maximum_supported_length",
@@ -436,9 +436,9 @@ func TestTimeSteamAdapter_Write(t *testing.T) {
 			name: "Write Timestream Request",
 			args: args{
 				req: &prompb.WriteRequest{
-					Timeseries: []*prompb.TimeSeries{
+					Timeseries: []prompb.TimeSeries{
 						{
-							Labels: []*prompb.Label{
+							Labels: []prompb.Label{
 								{
 									Name:  "__name__",
 									Value: "sample_name",
@@ -460,9 +460,9 @@ func TestTimeSteamAdapter_Write(t *testing.T) {
 			name: "Write Timestream Request With Error",
 			args: args{
 				req: &prompb.WriteRequest{
-					Timeseries: []*prompb.TimeSeries{
+					Timeseries: []prompb.TimeSeries{
 						{
-							Labels: []*prompb.Label{
+							Labels: []prompb.Label{
 								{
 									Name:  "__name__",
 									Value: "sample_name_error",
@@ -527,7 +527,7 @@ func TestTimeSteamAdapter_Read(t *testing.T) {
 					{
 						Timeseries: []*prompb.TimeSeries{
 							{
-								Labels: []*prompb.Label{
+								Labels: []prompb.Label{
 									{
 										Name:  "__name__",
 										Value: "mock",
@@ -549,7 +549,7 @@ func TestTimeSteamAdapter_Read(t *testing.T) {
 								},
 							},
 							{
-								Labels: []*prompb.Label{
+								Labels: []prompb.Label{
 									{
 										Name:  "__name__",
 										Value: "mock",

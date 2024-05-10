@@ -7,8 +7,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup go env
-        uses: actions/setup-go@v5.0.1
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.16'
+          go-version: '1.21'
       - name: Run tests
         run: go test -v ./...
