@@ -326,7 +326,7 @@ func (t TimeStreamAdapter) readDimension(measureName string) (dimensions []strin
 	return
 }
 
-func (t TimeStreamAdapter) readLabels(labels []*prompb.Label) (task writeTask) {
+func (t TimeStreamAdapter) readLabels(labels []prompb.Label) (task writeTask) {
 	for _, s := range labels {
 		if s.Name == model.MetricNameLabel {
 			task.measureName = s.Value
@@ -345,14 +345,14 @@ func (t TimeStreamAdapter) handleQueryResult(qo *timestreamquery.QueryOutput, ti
 	for _, row := range qo.Rows {
 		var ts prompb.TimeSeries
 
-		ts.Labels = append(ts.Labels, &prompb.Label{
+		ts.Labels = append(ts.Labels, prompb.Label{
 			Name:  model.MetricNameLabel,
 			Value: measureName,
 		})
 
 		for i, d := range row.Data {
 			if d.ScalarValue != nil {
-				ts.Labels = append(ts.Labels, &prompb.Label{
+				ts.Labels = append(ts.Labels, prompb.Label{
 					Name:  *qo.ColumnInfo[i].Name,
 					Value: *d.ScalarValue,
 				})
