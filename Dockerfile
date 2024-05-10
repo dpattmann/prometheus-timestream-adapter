@@ -1,4 +1,4 @@
-FROM golang:1.15.3-alpine3.12 as build
+FROM golang:1.21-alpine as build
 
 WORKDIR /src/prometheus-timestream-adapter
 ADD . /src/prometheus-timestream-adapter
