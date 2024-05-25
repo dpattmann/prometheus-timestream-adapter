@@ -19,17 +19,19 @@
 package main
 
 import (
+	"context"
+	"io"
+	"net/http"
+
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
 	"go.uber.org/zap"
-	"io/ioutil"
-	"net/http"
 )
 
-func writeHandler(logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) http.HandlerFunc {
+func writeHandler(ctx context.Context, logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		compressed, err := ioutil.ReadAll(r.Body)
+		compressed, err := io.ReadAll(r.Body)
 		if err != nil {
 			logger.Errorw("Read error", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -50,7 +52,7 @@ func writeHandler(logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) 
 			return
 		}
 
-		err = ad.Write(&req)
+		err = ad.Write(ctx, &req)
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -59,9 +61,9 @@ func writeHandler(logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) 
 	}
 }
 
-func readHandler(logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) http.HandlerFunc {
+func readHandler(ctx context.Context, logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		compressed, err := ioutil.ReadAll(r.Body)
+		compressed, err := io.ReadAll(r.Body)
 		if err != nil {
 			logger.Errorw("Read error", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -83,7 +85,7 @@ func readHandler(logger *zap.SugaredLogger, ad PrometheusRemoteStorageAdapter) h
 		}
 
 		var resp *prompb.ReadResponse
-		resp, err = ad.Read(&req)
+		resp, err = ad.Read(ctx, &req)
 		if err != nil {
 			logger.Errorw("Error executing query", "query", req, "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
