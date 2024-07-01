@@ -19,6 +19,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -31,7 +32,7 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-type config struct {
+type adapterCfg struct {
 	help          bool
 	awsRegion     string
 	databaseName  string
@@ -45,7 +46,7 @@ type config struct {
 }
 
 var (
-	cfg = new(config)
+	cfg = new(adapterCfg)
 
 	receivedSamples = prometheus.NewCounter(
 		prometheus.CounterOpts{
@@ -103,6 +104,8 @@ func main() {
 		return
 	}
 
+	ctx := context.Background()
+
 	zapConfig := zap.NewProductionConfig()
 	zapConfig.DisableStacktrace = true
 
@@ -130,23 +133,23 @@ func main() {
 
 	sugar.Debugf("Sending logs to timeseries database %s in AWS Region %s", cfg.databaseName, cfg.awsRegion)
 
-	timeStreamAdapter := newTimeStreamAdapter(sugar, cfg, nil, nil)
-	if err := serve(sugar, cfg.listenAddr, timeStreamAdapter); err != nil {
+	timeStreamAdapter := newTimeStreamAdapter(ctx, sugar, cfg, newTimestreamQueryPaginator, nil, nil)
+	if err := serve(ctx, sugar, cfg.listenAddr, timeStreamAdapter); err != nil {
 		sugar.Errorw("Failed to listen", "addr", cfg.listenAddr, "err", err)
 		os.Exit(1)
 	}
 }
 
 type PrometheusRemoteStorageAdapter interface {
-	Write(records *prompb.WriteRequest) error
-	Read(request *prompb.ReadRequest) (*prompb.ReadResponse, error)
+	Write(ctx context.Context, records *prompb.WriteRequest) error
+	Read(ctx context.Context, request *prompb.ReadRequest) (*prompb.ReadResponse, error)
 	Name() string
 }
 
-func serve(logger *zap.SugaredLogger, addr string, storageAdapter PrometheusRemoteStorageAdapter) error {
+func serve(ctx context.Context, logger *zap.SugaredLogger, addr string, storageAdapter PrometheusRemoteStorageAdapter) error {
 	http.Handle(cfg.telemetryPath, promhttp.Handler())
-	http.Handle("/write", writeHandler(logger, storageAdapter))
-	http.Handle("/read", readHandler(logger, storageAdapter))
+	http.Handle("/write", writeHandler(ctx, logger, storageAdapter))
+	http.Handle("/read", readHandler(ctx, logger, storageAdapter))
 	http.Handle("/health", healthHandler(logger))
 
 	if cfg.tls {

@@ -19,38 +19,52 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"math"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/timestreamquery"
-	"github.com/aws/aws-sdk-go/service/timestreamquery/timestreamqueryiface"
-	"github.com/aws/aws-sdk-go/service/timestreamwrite"
-	"github.com/aws/aws-sdk-go/service/timestreamwrite/timestreamwriteiface"
-
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/timestreamquery"
+	"github.com/aws/aws-sdk-go-v2/service/timestreamwrite"
+	writetypes "github.com/aws/aws-sdk-go-v2/service/timestreamwrite/types"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
-
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/net/http2"
 )
 
 const TimestreamMaxRecordsPerRequest = 100
 
+type TimestreamQueryApi interface {
+	Query(ctx context.Context, params *timestreamquery.QueryInput, optFns ...func(*timestreamquery.Options)) (*timestreamquery.QueryOutput, error)
+}
+
+type TimestreamWriteApi interface {
+	WriteRecords(ctx context.Context, params *timestreamwrite.WriteRecordsInput, optFns ...func(*timestreamwrite.Options)) (*timestreamwrite.WriteRecordsOutput, error)
+}
+
+type NewQueryPaginator func(client TimestreamQueryApi, params *timestreamquery.QueryInput, optFns ...func(*timestreamquery.QueryPaginatorOptions)) PaginatorApi
+
+type PaginatorApi interface {
+	HasMorePages() bool
+	NextPage(ctx context.Context, optFns ...func(*timestreamquery.Options)) (*timestreamquery.QueryOutput, error)
+}
+
 type TimeStreamAdapter struct {
 	databaseName string
 	logger       *zap.SugaredLogger
 	tableName    string
-	timestreamqueryiface.TimestreamQueryAPI
-	timestreamwriteiface.TimestreamWriteAPI
+	TimestreamQueryApi
+	TimestreamWriteApi
+	NewQueryPaginator
 }
 
 type queryTask struct {
@@ -60,50 +74,43 @@ type queryTask struct {
 
 type writeTask struct {
 	measureName string
-	dimensions  []*timestreamwrite.Dimension
+	dimensions  []writetypes.Dimension
 }
 
-func newTimeStreamAdapter(logger *zap.SugaredLogger, cfg *config, writeSvc timestreamwriteiface.TimestreamWriteAPI, readSvc timestreamqueryiface.TimestreamQueryAPI) TimeStreamAdapter {
-	tr := &http.Transport{
-		ResponseHeaderTimeout: 20 * time.Second,
-		// Using DefaultTransport values for other parameters: https://golang.org/pkg/net/http/#RoundTripper
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			KeepAlive: 30 * time.Second,
-			Timeout:   30 * time.Second,
-		}).DialContext,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
+func newTimestreamQueryPaginator(client TimestreamQueryApi, params *timestreamquery.QueryInput, optFns ...func(*timestreamquery.QueryPaginatorOptions)) PaginatorApi {
+	return timestreamquery.NewQueryPaginator(client, params, optFns...)
+}
 
-	// So client makes HTTP/2 requests
-	_ = http2.ConfigureTransport(tr)
+func newTimeStreamAdapter(ctx context.Context, logger *zap.SugaredLogger, cfg *adapterCfg, newQueryPaginator NewQueryPaginator, writeSvc *timestreamwrite.Client, querySvc *timestreamquery.Client) TimeStreamAdapter {
+	if writeSvc == nil || querySvc == nil {
+		client := awshttp.NewBuildableClient().WithTransportOptions(func(tr *http.Transport) {
+			tr.ResponseHeaderTimeout = 20 * time.Second
 
-	if writeSvc == nil || readSvc == nil {
-		sess := session.Must(session.NewSession(
-			&aws.Config{
-				Region:     aws.String(cfg.awsRegion),
-				MaxRetries: aws.Int(10),
-				HTTPClient: &http.Client{
-					Transport: tr,
-				},
-			},
-		))
+			// Enable HTTP/2
+			err := http2.ConfigureTransport(tr)
+			if err != nil {
+				logger.Fatalw("Unable to configure HTTP/2 transport", "error", err)
+			}
+		})
 
-		if writeSvc == nil {
-			writeSvc = timestreamwrite.New(sess)
+		awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.awsRegion), config.WithHTTPClient(client), config.WithRetryMaxAttempts(10))
+		if err != nil {
+			logger.Fatalw("Unable to load AWS SDK config", "error", err)
 		}
 
-		if readSvc == nil {
-			readSvc = timestreamquery.New(sess)
+		if writeSvc == nil {
+			writeSvc = timestreamwrite.NewFromConfig(awsCfg)
+		}
+
+		if querySvc == nil {
+			querySvc = timestreamquery.NewFromConfig(awsCfg)
 		}
 	}
 
 	return TimeStreamAdapter{
-		TimestreamQueryAPI: readSvc,
-		TimestreamWriteAPI: writeSvc,
+		TimestreamQueryApi: querySvc,
+		TimestreamWriteApi: writeSvc,
+		NewQueryPaginator:  newQueryPaginator,
 		databaseName:       cfg.databaseName,
 		logger:             logger,
 		tableName:          cfg.tableName,
@@ -116,7 +123,7 @@ func (t TimeStreamAdapter) Name() string {
 	return "prometheus-timestream-adapter"
 }
 
-func (t TimeStreamAdapter) Write(req *prompb.WriteRequest) (err error) {
+func (t TimeStreamAdapter) Write(ctx context.Context, req *prompb.WriteRequest) (err error) {
 	timer := prometheus.NewTimer(sentBatchDuration.WithLabelValues(t.Name()))
 	defer timer.ObserveDuration()
 
@@ -124,7 +131,7 @@ func (t TimeStreamAdapter) Write(req *prompb.WriteRequest) (err error) {
 	receivedSamples.Add(float64(len(records)))
 
 	for _, chunk := range t.splitRecords(records) {
-		_, err = t.WriteRecords(&timestreamwrite.WriteRecordsInput{
+		_, err = t.WriteRecords(ctx, &timestreamwrite.WriteRecordsInput{
 			DatabaseName: aws.String(t.databaseName),
 			TableName:    aws.String(t.tableName),
 			Records:      chunk,
@@ -153,7 +160,7 @@ func (t TimeStreamAdapter) allCharactersValid(str string) bool {
 	return true
 }
 
-func (t TimeStreamAdapter) toRecords(writeRequest *prompb.WriteRequest) (records []*timestreamwrite.Record) {
+func (t TimeStreamAdapter) toRecords(writeRequest *prompb.WriteRequest) (records []writetypes.Record) {
 	for _, ts := range writeRequest.Timeseries {
 		task := t.readLabels(ts.Labels)
 		for _, s := range ts.Samples {
@@ -168,13 +175,13 @@ func (t TimeStreamAdapter) toRecords(writeRequest *prompb.WriteRequest) (records
 				continue
 			}
 
-			records = append(records, &timestreamwrite.Record{
+			records = append(records, writetypes.Record{
 				Dimensions:       task.dimensions,
 				MeasureName:      aws.String(task.measureName),
-				MeasureValueType: aws.String("DOUBLE"),
+				MeasureValueType: writetypes.MeasureValueTypeDouble,
 				MeasureValue:     aws.String(fmt.Sprint(s.Value)),
 				Time:             aws.String(fmt.Sprint(s.Timestamp)),
-				TimeUnit:         aws.String("MILLISECONDS"),
+				TimeUnit:         writetypes.TimeUnitMilliseconds,
 			})
 		}
 	}
@@ -182,8 +189,8 @@ func (t TimeStreamAdapter) toRecords(writeRequest *prompb.WriteRequest) (records
 	return
 }
 
-func (t TimeStreamAdapter) splitRecords(records []*timestreamwrite.Record) [][]*timestreamwrite.Record {
-	var chunked [][]*timestreamwrite.Record
+func (t TimeStreamAdapter) splitRecords(records []writetypes.Record) [][]writetypes.Record {
+	var chunked [][]writetypes.Record
 
 	for i := 0; i < len(records); i += TimestreamMaxRecordsPerRequest {
 		end := i + TimestreamMaxRecordsPerRequest
@@ -199,12 +206,12 @@ func (t TimeStreamAdapter) splitRecords(records []*timestreamwrite.Record) [][]*
 
 // Read implementation
 
-func (t TimeStreamAdapter) Read(request *prompb.ReadRequest) (response *prompb.ReadResponse, err error) {
+func (t TimeStreamAdapter) Read(ctx context.Context, request *prompb.ReadRequest) (response *prompb.ReadResponse, err error) {
 	var queryResult prompb.QueryResult
 	var queryResults []*prompb.QueryResult
 
 	for _, q := range request.Queries {
-		queryResult, err = t.runReadRequestQuery(q)
+		queryResult, err = t.runReadRequestQuery(ctx, q)
 
 		if err != nil {
 			return
@@ -220,26 +227,25 @@ func (t TimeStreamAdapter) Read(request *prompb.ReadRequest) (response *prompb.R
 	return
 }
 
-func (t TimeStreamAdapter) runReadRequestQuery(q *prompb.Query) (result prompb.QueryResult, err error) {
-	task, err := t.buildTimeStreamQueryString(q)
+func (t TimeStreamAdapter) runReadRequestQuery(ctx context.Context, q *prompb.Query) (result prompb.QueryResult, err error) {
+	task, err := t.buildTimeStreamQueryString(ctx, q)
 
 	if err != nil {
 		return
 	}
 
 	var timeSeries []*prompb.TimeSeries
-	err = t.QueryPages(
-		&timestreamquery.QueryInput{
-			QueryString: &task.query,
-		},
-		func(output *timestreamquery.QueryOutput, lastPage bool) bool {
-			timeSeries = t.handleQueryResult(output, timeSeries, task.measureName)
-			return !lastPage
-		},
-	)
+	paginator := t.NewQueryPaginator(t, &timestreamquery.QueryInput{
+		QueryString: aws.String(task.query),
+	})
 
-	if err != nil {
-		return
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return result, err
+		}
+
+		timeSeries = t.handleQueryResult(page, timeSeries, task.measureName)
 	}
 
 	result = prompb.QueryResult{
@@ -250,7 +256,7 @@ func (t TimeStreamAdapter) runReadRequestQuery(q *prompb.Query) (result prompb.Q
 }
 
 // BuildCommand generates the proper SQL for the runReadRequestQuery
-func (t TimeStreamAdapter) buildTimeStreamQueryString(q *prompb.Query) (task queryTask, err error) {
+func (t TimeStreamAdapter) buildTimeStreamQueryString(ctx context.Context, q *prompb.Query) (task queryTask, err error) {
 	matchers := make([]string, 0, len(q.Matchers))
 	for _, m := range q.Matchers {
 		// Metric Names
@@ -285,7 +291,7 @@ func (t TimeStreamAdapter) buildTimeStreamQueryString(q *prompb.Query) (task que
 	matchers = append(matchers, fmt.Sprintf("time BETWEEN from_milliseconds(%d) AND from_milliseconds(%d)",
 		q.StartTimestampMs, q.EndTimestampMs))
 
-	dimensions, err := t.readDimension(task.measureName)
+	dimensions, err := t.readDimension(ctx, task.measureName)
 
 	if err != nil {
 		return
@@ -299,10 +305,10 @@ func (t TimeStreamAdapter) buildTimeStreamQueryString(q *prompb.Query) (task que
 	return
 }
 
-func (t TimeStreamAdapter) readDimension(measureName string) (dimensions []string, err error) {
+func (t TimeStreamAdapter) readDimension(ctx context.Context, measureName string) (dimensions []string, err error) {
 	query := fmt.Sprintf("SHOW MEASURES FROM \"%s\".\"%s\" LIKE '%s'", cfg.databaseName, cfg.tableName, measureName)
 
-	queryOutput, err := t.Query(&timestreamquery.QueryInput{QueryString: &query})
+	queryOutput, err := t.Query(ctx, &timestreamquery.QueryInput{QueryString: &query})
 	if err != nil {
 		return
 	}
@@ -332,7 +338,7 @@ func (t TimeStreamAdapter) readLabels(labels []prompb.Label) (task writeTask) {
 			task.measureName = s.Value
 			continue
 		}
-		task.dimensions = append(task.dimensions, &timestreamwrite.Dimension{
+		task.dimensions = append(task.dimensions, writetypes.Dimension{
 			Name:  aws.String(s.Name),
 			Value: aws.String(s.Value),
 		})
