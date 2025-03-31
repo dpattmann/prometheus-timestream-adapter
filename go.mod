@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/prometheus v0.302.1
 	github.com/spf13/pflag v1.0.6
 	go.uber.org/zap v1.27.0
-	golang.org/x/net v0.37.0
+	golang.org/x/net v0.38.0
 )
 
 require (
