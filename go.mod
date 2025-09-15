@@ -1,6 +1,6 @@
 module github.com/dpattmann/prometheus-timestream-adapter
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.1
 
@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/prometheus v0.305.0
 	github.com/spf13/pflag v1.0.10
 	go.uber.org/zap v1.27.0
-	golang.org/x/net v0.43.0
+	golang.org/x/net v0.44.0
 )
 
 require (
@@ -27,7 +27,7 @@ require (
 	github.com/prometheus/procfs v0.16.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
 )
