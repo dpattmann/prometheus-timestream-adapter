@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.67.1
-	github.com/prometheus/prometheus v0.307.1
+	github.com/prometheus/prometheus v0.307.2
 	github.com/spf13/pflag v1.0.10
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.46.0
