@@ -1,8 +1,6 @@
 module github.com/dpattmann/prometheus-timestream-adapter
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.24.9
 
 require (
 	github.com/aws/aws-sdk-go v1.55.8
@@ -11,7 +9,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.67.5
-	github.com/prometheus/prometheus v0.308.1
+	github.com/prometheus/prometheus v0.309.0
 	github.com/spf13/pflag v1.0.10
 	go.uber.org/zap v1.27.1
 	golang.org/x/net v0.48.0
